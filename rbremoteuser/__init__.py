@@ -17,6 +17,15 @@ class RemoteUserMiddleware(object):
         if siteconfig.get('auth_backend') != RemoteUserBackend.backend_id:
             return
 
+        # check whitelist
+        if request.user.is_authenticated():
+            whitelist = siteconfig.get('auth_rbremoteuser_whitelist_users')
+            try:
+                whitelist.index(request.user.get_username())
+            except ValueError:
+                # not found in whitelist
+                self._remove_invalid_user(request)
+
         try:
             username = request.META['REMOTE_USER']
         except KeyError:
@@ -82,15 +91,8 @@ class RemoteUserBackend(AuthBackend):
     supports_change_email = True
     supports_change_password = False
 
-    _siteconfig = SiteConfiguration.objects.get_current()
-
     def authenticate(self, remote_user, **kwargs):
         username = remote_user.strip()
-
-        """Check white list"""
-        if (self._is_user_in_whitelist(username)):
-            return None
-
         return self.get_or_create_user(username)
 
     def get_or_create_user(self, username):
@@ -106,9 +108,3 @@ class RemoteUserBackend(AuthBackend):
             user.save()
             return user
 
-    def _is_user_in_whitelist(self, username):
-        whitelist = self._siteconfig.get('auth_rbremoteuser_whitelist_users')
-        try:
-            return whitelist.index(username) >= 0
-        except:
-            return False
