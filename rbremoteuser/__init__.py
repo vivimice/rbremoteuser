@@ -38,6 +38,34 @@ class RemoteUserMiddleware(object):
     def _remove_invalid_user(self, request):
         auth.logout(request)
 
+class RemoteUserSettingsForm(SiteSettingsForm):
+
+    whitelist_users = forms.CharField(
+        label='LocalUsers',
+        help_text='A comma-seperated list of users '
+            'which are by-passed by this module. '
+            '(So built-in modules will be used '
+            'against these users)',
+        required=False
+    )
+
+    def load(self):
+        super(RemoteUserSettingsForm, self).load()
+        try:
+            self.fields['whitelist_users'].initial = ', '.join(self.siteconfig.get('auth_rbremoteuser_whitelist_users'))
+        except Exception, e:
+            logging.error(e)
+            self.fields['whitelist_users'].initial = 'admin'
+
+
+    def save(self):
+        self.siteconfig.set('auth_rbremoteuser_whitelist_users', re.split(r',\s*', self.cleaned_data['whitelist_users']))
+        super(RemoteUserSettingsForm, self).save()
+
+    class Meta:
+        title = 'RemoteUser Authentication Settings'
+        save_blacklist = ('whitelist_users',)
+
 class RemoteUserBackend(AuthBackend):
     """Authenticate a user using REMOTE_USER CGI variable
 
@@ -84,31 +112,3 @@ class RemoteUserBackend(AuthBackend):
             return whitelist.index(username) >= 0
         except:
             return False
-
-class RemoteUserSettingsForm(SiteSettingsForm):
-
-    whitelist_users = forms.CharField(
-        label='LocalUsers',
-        help_text='A comma-seperated list of users '
-            'which are by-passed by this module. '
-            '(So built-in modules will be used '
-            'against these users)',
-        required=False
-    )
-
-    def load(self):
-        super(RemoteUserSettingsForm, self).load()
-        try:
-            self.fields['whitelist_users'].initial = ', '.join(self.siteconfig.get('auth_rbremoteuser_whitelist_users'))
-        except Exception, e:
-            logging.error(e)
-            self.fields['whitelist_users'].initial = 'admin'
-
-
-    def save(self):
-        self.siteconfig.set('auth_rbremoteuser_whitelist_users', re.split(r',\s*', self.cleaned_data['whitelist_users']))
-        super(RemoteUserSettingsForm, self).save()
-
-    class Meta:
-        title = 'RemoteUser Authentication Settings'
-        save_blacklist = ('whitelist_users',)
